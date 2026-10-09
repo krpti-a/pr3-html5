@@ -1,0 +1,25 @@
+{
+  "name": "pr3-html5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Platform Racing 3 rebuilt for modern browsers",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "node tools/build.mjs --watch",
+    "start": "node server/index.js",
+    "test": "node --test test/",
+    "typecheck": "tsc --noEmit -p client",
+    "test:physics": "sh tools/physics/run-all.sh",
+    "headless": "node --expose-gc --max-old-space-size=1536 tools/headless/run.mjs",
+    "headless:chrome": "node tools/headless/chrome.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "fflate": "^0.8.3",
+    "typescript": "^5.9.2"
+  }
+}

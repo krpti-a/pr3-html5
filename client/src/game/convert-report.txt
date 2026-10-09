@@ -1,0 +1,23 @@
+com/jiggmin/pr3/PlatformRacing3.as: unresolved identifier PlatformRacing3__init_
+com/jiggmin/pr3/editor/blockEditor/BlockCustomItemSettingsUI.as: auto-declared exists,_prop,updatePropertyTarget,updatePropertyField in constructUI, auto-declared negLog,posLog in constructNumericalUIInput, auto-declared dropdownOptions in constructSpecialUIInput, auto-declared adjusted in formatNumericalUIInput, auto-declared _inp in setBlockPickerValueUIInput, auto-declared _property,updatePropertyTarget,updatePropertyField in updateDropdownUIInput
+com/jiggmin/pr3/editor/cursor/BlockMoverCursor.as: auto-declared _loc_3 in openCustomContextMenuHandler
+com/jiggmin/pr3/effects/BuzzsawEffect.as: auto-declared futureBlock in handleTurns, auto-declared temp in rotateVelocity
+com/jiggmin/pr3/effects/LaserEffect.as: auto-declared blockSideSetting in hit
+com/jiggmin/pr3/effects/ProjectileEffect.as: auto-declared realVars in testPoint
+com/jiggmin/pr3/effects/SnowballEffect.as: auto-declared _loc_2,_loc_3,_loc_4,_loc_5 in remove
+com/jiggmin/pr3/game/MatchPage.as: auto-declared timeToPass in iFinished
+com/jiggmin/pr3/items/FreezeRay.as: auto-declared _loc_4 in sendBeam
+com/jiggmin/pr3/items/LightningCloud.as: auto-declared cloud in useItem
+com/jiggmin/pr3/items/PortableBlock.as: auto-declared patternIndex,relativeX,relativeY in useItem
+com/jiggmin/pr3/items/Retreater.as: auto-declared coord in useItem
+com/jiggmin/pr3/items/Sword.as: auto-declared i in useItem
+com/jiggmin/pr3/lister/MyBlockSelectorCategory.as: ctor: super() args use this
+com/jiggmin/pr3/lister/MyLevelSelector.as: auto-declared _loc_3_5 in getMyLevelsCallback
+com/jiggmin/pr3/lobby/multiPlayer/Levels.as: auto-declared searchButton in Levels
+com/jiggmin/pr3/lobby/multiPlayer/PlayerListing.as: auto-declared spectatePlayer in remove
+com/jiggmin/pr3/player/ActivePlayer.as: auto-declared magnetPower,_loc_22,_loc_23,_loc_24,_loc_25 in touchBlock, auto-declared hatDistanceX,hatDistanceY,quickMaths,slowMaths,slowMaths2,slowMaths3,slowMaths4,slowMaths5,lastSuckMS,blurEffect,noMovement in step
+com/jiggmin/pr3/player/LocalPlayer.as: auto-declared timeToPass in enterFrameHandler
+SKIP existing blossomSocket/BasicSocket.ts
+SKIP existing blossomSocket/CommandSocket.ts
+SKIP existing api/Sparkworkz.ts
+SKIP existing net/CachableURLLoader.ts
