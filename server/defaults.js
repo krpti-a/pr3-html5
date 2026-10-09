@@ -1,6 +1,6 @@
 // Default content, enforced on every startup: an admin account with every hat and part and the whole
 // campaign completed on gold. An existing account with that name (case-insensitive) is upgraded in place.
-// Override with PR3_ADMIN_USER / PR3_ADMIN_PASS.
+// PR3_ADMIN_PASS overrides an existing password only when explicitly configured.
 import { hashPassword, verifyPassword, HAT_MAX, PART_MAX } from './users.js';
 
 const ADMIN_USER = process.env.PR3_ADMIN_USER ?? '123456q';
@@ -12,7 +12,9 @@ export function ensureDefaults(db) {
   if (!u) {
     u = db.prepare("INSERT INTO users (username, password, email) VALUES (?, ?, '') RETURNING id, password").get(ADMIN_USER, hashPassword(ADMIN_PASS));
     console.log(`created default admin account "${ADMIN_USER}"`);
-  } else if (!verifyPassword(ADMIN_PASS, u.password)) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashPassword(ADMIN_PASS), u.id);
+  } else if (process.env.PR3_ADMIN_PASS && !verifyPassword(ADMIN_PASS, u.password)) {
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashPassword(ADMIN_PASS), u.id);
+  }
   db.prepare("UPDATE users SET group_name = 'Admin', permission_rank = 1000, archived = 0, hats = ?, heads = ?, bodys = ?, feets = ? WHERE id = ?")
     .run(range(HAT_MAX), range(PART_MAX), range(PART_MAX), range(PART_MAX), u.id);
   // a gold run (half a second under the gold time) on every campaign level not already golded

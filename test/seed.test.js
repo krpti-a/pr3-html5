@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { openDb } from '../server/db.js';
-import { UserStore } from '../server/users.js';
+import { ensureDefaults } from '../server/defaults.js';
+import { hashPassword, UserStore } from '../server/users.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const seed = join(root, 'data', 'seed.db');
@@ -62,5 +63,15 @@ test('the default account authenticates with the documented credentials only', (
     assert.equal(users.authenticate('123456q', 'Faszos'), 1);
     assert.equal(users.authenticate('123456q', 'wrong-password'), 0);
     assert.equal(users.authenticate('missing-user', 'Faszos'), 0);
+  });
+});
+
+test('a changed admin password survives startup defaults', () => {
+  withFreshDatabase(db => {
+    db.prepare('UPDATE users SET password = ? WHERE id = 1').run(hashPassword('new-private-password'));
+    ensureDefaults(db);
+    const users = new UserStore(db);
+    assert.equal(users.authenticate('123456q', 'new-private-password'), 1);
+    assert.equal(users.authenticate('123456q', 'Faszos'), 0);
   });
 });
