@@ -12,9 +12,6 @@ export function openDb(file, seed) {
   db.exec(SCHEMA);
   // migrations
   if (!db.prepare('PRAGMA table_info(level_ratings)').all().some(c => c.name === 'rated_on')) db.exec('ALTER TABLE level_ratings ADD COLUMN rated_on INTEGER NOT NULL DEFAULT 0');
-  // the host account that owns the bundled campaign levels (as in the original local setup's init.sql);
-  // it has no password, so nobody can log in as it
-  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, group_name, heads, bodys, feets) VALUES (1, 'LocalHost', 'localhost@localhost.invalid', 'Host', '[1,2,3,26]', '[1,2,3,26]', '[1,2,3,26]')`).run();
   return db;
 }
 

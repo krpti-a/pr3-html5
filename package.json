@@ -8,7 +8,7 @@
     "build": "node tools/build.mjs",
     "dev": "node tools/build.mjs --watch",
     "start": "node server/index.js",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "typecheck": "tsc --noEmit -p client",
     "test:physics": "sh tools/physics/run-all.sh",
     "headless": "node --expose-gc --max-old-space-size=1536 tools/headless/run.mjs",
