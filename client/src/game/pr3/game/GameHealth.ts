@@ -14,8 +14,8 @@ export class GameHealth extends Removable {
   displayHealth(event: Event): void {
          if((GamePage.instance.levelType == "deathmatch" || GamePage.instance.levelType == "damageDash") && SocketManager.socket != null && GamePage.instance.localPlayer != null && GamePage.instance.localPlayer.lifeBar != null)
          {
-            this.m.holder.timeBox.text = new String(GamePage.instance.localPlayer.lifeBar.percent + " / " + GamePage.instance.localPlayer.lifeBar.maxPercent);
-            this.m.holder2.timeBox.text = new String(GamePage.instance.localPlayer.lifeBar.percent + " / " + GamePage.instance.localPlayer.lifeBar.maxPercent);
+            this.m.holder.timeBox.text = String(GamePage.instance.localPlayer.lifeBar.percent + " / " + GamePage.instance.localPlayer.lifeBar.maxPercent);
+            this.m.holder2.timeBox.text = String(GamePage.instance.localPlayer.lifeBar.percent + " / " + GamePage.instance.localPlayer.lifeBar.maxPercent);
          }
          else
          {

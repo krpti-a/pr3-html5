@@ -69,6 +69,8 @@ export class Content {
     const title = String(p.p_title ?? '').trim();
     if (title.length < 1 || title.length > 50) return { error: 'Level title must be between 1 and 50 chars long!' };
     if ((p.p_comment ?? '').length > 1000) return { error: "Level comment can't be longer than 1000 chars long!" };
+    const levelData = String(p.p_level_data ?? '');
+    if (levelData.length > 3000000) return { error: 'Level data is too large.' };
     let t = this.db.prepare('SELECT id FROM level_titles WHERE title = ? COLLATE NOCASE AND author_id = ? AND deleted = 0').get(title, userId);
     if (!t) t = this.db.prepare('INSERT INTO level_titles (title, author_id) VALUES (?, ?) RETURNING id').get(title, userId);
     const version = (this.db.prepare('SELECT max(version) AS v FROM levels WHERE id = ?').get(t.id).v ?? 0) + 1;
@@ -77,12 +79,12 @@ export class Content {
     this.db.prepare(`INSERT INTO levels (id, version, description, publish, song_id, mode, seconds, gravity, alien, sfchm, snow, wind, items, health, koth, bg_image, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(t.id, version, String(p.p_comment ?? ''), +p.p_publish ? 1 : 0, String(p.p_song_id ?? 'random'), mode,
       +p.p_seconds || 0, +p.p_gravity || 1, +p.p_alien || 0, +p.p_sfchm || 0, +p.p_snow || 0, +p.p_wind || 0, [...new Set(items)].join(','),
-      mode === 'deathmatch' ? Math.max(1, +p.p_health || 5) : 5, String(p.p_king_of_the_hat ?? ''), String(p.p_bg_image ?? ''), z(String(p.p_level_data ?? '')));
+      mode === 'deathmatch' ? Math.max(1, +p.p_health || 5) : 5, String(p.p_king_of_the_hat ?? ''), String(p.p_bg_image ?? ''), z(levelData));
     return { id: t.id, version };
   }
   deleteLevel(id, userId) { this.db.prepare('UPDATE level_titles SET deleted = 1 WHERE id = ? AND author_id = ?').run(id, userId); }
-  unpublishLevel(id, userId) {
-    const l = this.level(id); if (!l || l.authorId !== userId) return;
+  unpublishLevel(id, userId, any = false) {
+    const l = this.level(id); if (!l || (!any && l.authorId !== userId)) return;
     this.db.prepare('UPDATE levels SET publish = 0 WHERE id = ? AND version = ?').run(id, l.version);
   }
   addPlays(id, n) { this.db.prepare('UPDATE level_titles SET plays = plays + ? WHERE id = ?').run(n, id); }
@@ -99,10 +101,12 @@ export class Content {
     const title = String(p.p_title ?? '').trim();
     if (title.length < 1 || title.length > 50) return 'Block title must be between 1 and 50 chars long!';
     const cat = String(p.p_category ?? '');
+    const image = String(p.p_image_data ?? ''), settings = String(p.p_settings ?? '');
+    if (cat.length > 80 || String(p.p_comment ?? '').length > 1000 || image.length > 512000 || settings.length > 64000) return 'Block data is too large.';
     let t = this.db.prepare('SELECT id FROM block_titles WHERE title = ? COLLATE NOCASE AND category = ? COLLATE NOCASE AND author_id = ? AND deleted = 0').get(title, cat, userId);
     if (!t) t = this.db.prepare('INSERT INTO block_titles (title, category, author_id) VALUES (?, ?, ?) RETURNING id').get(title, cat, userId);
     const version = (this.db.prepare('SELECT max(version) AS v FROM blocks WHERE id = ?').get(t.id).v ?? 0) + 1;
-    this.db.prepare('INSERT INTO blocks (id, version, description, image, settings) VALUES (?, ?, ?, ?, ?)').run(t.id, version, String(p.p_comment ?? ''), z(String(p.p_image_data ?? '')), z(String(p.p_settings ?? '')));
+    this.db.prepare('INSERT INTO blocks (id, version, description, image, settings) VALUES (?, ?, ?, ?, ?)').run(t.id, version, String(p.p_comment ?? ''), z(image), z(settings));
     return '';
   }
   // "My blocks"/"My stamps" lists use the original's category ids: default-all-<kind>s,
@@ -132,10 +136,12 @@ export class Content {
   saveStamp(userId, p) {
     const title = String(p.p_title ?? '').trim(); if (!title) return 'Invalid title';
     const cat = String(p.p_category ?? '');
+    const art = String(p.p_art ?? '');
+    if (title.length > 50 || cat.length > 80 || String(p.p_comment ?? '').length > 1000 || art.length > 512000) return 'Stamp data is too large.';
     let t = this.db.prepare('SELECT id FROM stamp_titles WHERE title = ? COLLATE NOCASE AND category = ? AND author_id = ? AND deleted = 0').get(title, cat, userId);
     if (!t) t = this.db.prepare('INSERT INTO stamp_titles (title, category, author_id) VALUES (?, ?, ?) RETURNING id').get(title, cat, userId);
     const version = (this.db.prepare('SELECT max(version) AS v FROM stamps WHERE id = ?').get(t.id).v ?? 0) + 1;
-    this.db.prepare('INSERT INTO stamps (id, version, description, art) VALUES (?, ?, ?, ?)').run(t.id, version, String(p.p_comment ?? ''), z(String(p.p_art ?? '')));
+    this.db.prepare('INSERT INTO stamps (id, version, description, art) VALUES (?, ?, ?, ?)').run(t.id, version, String(p.p_comment ?? ''), z(art));
     return '';
   }
   myStampCategories(userId) { return this.db.prepare("SELECT category FROM stamp_titles WHERE author_id = ? AND deleted = 0 AND category != '' GROUP BY lower(category) ORDER BY lower(category)").all(userId).map(r => r.category); }

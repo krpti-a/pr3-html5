@@ -6,7 +6,7 @@ import { BlockEvent, BlockManager, DropdownEvent, ImageButton, MessagePopup, MyB
 import { $reg } from '../../refs.ts';
 
 export class MyBlockSelector extends CategorySelector {
-  static lastCategory: string = new String();
+  static lastCategory: string = String();
   static lastCategoryPage: any = ({} as any);
   static getMyBlocksStart: any = ({} as any);
   static getMyBlocksCount: any = ({} as any);
@@ -85,7 +85,7 @@ export class MyBlockSelector extends CategorySelector {
          this.requestArray = new Array();
          for (_loc_2 of $each(param1))
          {
-            this.requestArray.push(new Number(_loc_2.blockID));
+            this.requestArray.push(Number(_loc_2.blockID));
          }
          BlockManager.requestManyBlocks(this.requestArray);
       }

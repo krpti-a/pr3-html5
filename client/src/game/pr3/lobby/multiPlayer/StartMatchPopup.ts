@@ -64,7 +64,7 @@ export class StartMatchPopup extends ButtonPopup {
          var _loc_2= false;
          if(this.selectedLevel != null)
          {
-            _loc_1 = new XML("<Params><p_level_id>" + this.selectedLevel.levelID + "</p_level_id></Params>");
+            _loc_1 = { p_level_id: this.selectedLevel.levelID };
             _loc_2 = false;
             Sparkworkz.DataAccess("SetLOTD",_loc_1,$b(this, 'setFeaturedLevelCallback'),_loc_2);
          }

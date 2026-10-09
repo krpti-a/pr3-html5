@@ -35,6 +35,15 @@ export const PATCHES = [
   // E4X: `Row.block_id[i]` is the i-th row's block_id (an XMLList); the JSON responses expose rows as Row[i]
   ['pr3/lister/MyBlockSelector.ts', '_loc_8 = _loc_3.block_id[_loc_7];', '_loc_8 = _loc_3[_loc_7].block_id;'],
   ['pr3/lister/MyBlockSelectorCategory.ts', '_loc_8 = _loc_3.block_id[_loc_7];', '_loc_8 = _loc_3[_loc_7].block_id;'],
+  // E4X params (no XML class in the port): the API layer takes a plain object
+  ['pr3/lobby/multiPlayer/StartMatchPopup.ts', '_loc_1 = new XML("<Params><p_level_id>" + this.selectedLevel.levelID + "</p_level_id></Params>");', '_loc_1 = { p_level_id: this.selectedLevel.levelID };'],
+  ['pr3/game/FinishPopup.ts', 'var _loc_1= new XML("<Params><p_level_id>" + this.levelID + "</p_level_id></Params>");', 'var _loc_1= { p_level_id: this.levelID };'],
+  // ModSelector requests the first page from Lister's constructor, before archiveNum is set (AS3 field
+  // initializers run before the constructor, TS ones after super()): skip that request, load once it's known
+  ["pr3/lobby/mod/ReportedMessageSelector.ts", "  requestResultsFromServer(param1: number, param2: number): void {\n    param1 = int(param1); param2 = int(param2);\n         var _loc_3= ({} as any);", "  requestResultsFromServer(param1: number, param2: number): void {\n    param1 = int(param1); param2 = int(param2);\n         if(this.archiveNum === undefined) return;\n         var _loc_3= ({} as any);"],
+  ["pr3/lobby/mod/ReportedMessageSelector.ts", "         if(param1)\n         {\n            this.archiveNum = int(1);\n         }\n", "         if(param1)\n         {\n            this.archiveNum = int(1);\n         }\n         this.setPageNum(this.getLastRememberedPage());\n"],
+  ["pr3/lobby/mod/ReportedChatSelector.ts", "  requestResultsFromServer(param1: number, param2: number): void {\n    param1 = int(param1); param2 = int(param2);\n         var _loc_3= ({} as any);", "  requestResultsFromServer(param1: number, param2: number): void {\n    param1 = int(param1); param2 = int(param2);\n         if(this.archiveNum === undefined) return;\n         var _loc_3= ({} as any);"],
+  ["pr3/lobby/mod/ReportedChatSelector.ts", "         if(param1)\n         {\n            this.archiveNum = int(1);\n         }\n", "         if(param1)\n         {\n            this.archiveNum = int(1);\n         }\n         this.setPageNum(this.getLastRememberedPage());\n"],
 ];
 
 // AS3 private members are per-class: a subclass may declare its own private member with the same name

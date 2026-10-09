@@ -76,7 +76,9 @@ export function getQualifiedClassName(o: any): string {
   return c?.__qname ?? c?.name ?? 'Object';
 }
 export function trace(...a: any[]) { if ((globalThis as any).PR3_DEBUG) console.log(...a); }
-export function navigateToURL(req: any, target = '_blank') { window.open(typeof req === 'string' ? req : req.url, target); }
+// links from game text (level descriptions, PMs, chat) may only open web pages: a javascript:/data: url would run script on this origin
+export function safeUrl(url: string) { try { return ['http:', 'https:'].includes(new URL(url, location.href).protocol); } catch { return false; } }
+export function navigateToURL(req: any, target = '_blank') { const url = typeof req === 'string' ? req : req?.url; if (safeUrl(url)) window.open(url, target, 'noopener'); }
 export function describeType(_o: any) { return null; }
 export const escapeMultiByte = encodeURIComponent, unescapeMultiByte = decodeURIComponent;
 

@@ -146,6 +146,7 @@ class PlayerUser extends BaseUser {
     this.id = row.id; this.username = row.username; this.nameColor = row.name_color; this.group = row.group_name; this.permissionRank = row.permission_rank;
     this.totalExp = row.total_exp; ({ rank: this.rank, exp: this.exp } = rankFromTotal(this.totalExp)); this.bonusExp = row.bonus_exp;
     this.lastOnline = row.last_online ?? 0;
+    this.lastIp = row.last_ip ?? '';
     const arr = (s, max) => new Set(JSON.parse(s).filter(x => x >= 1 && x <= max));
     this.hats = arr(row.hats, HAT_MAX); this.heads = arr(row.heads, PART_MAX); this.bodys = arr(row.bodys, PART_MAX); this.feets = arr(row.feets, PART_MAX);
     this.hats.add(1);
@@ -185,6 +186,7 @@ class PlayerUser extends BaseUser {
       JSON.stringify([...this.hats].filter(h => !this.tempHats?.has(h))), JSON.stringify([...this.heads]), JSON.stringify([...this.bodys]), JSON.stringify([...this.feets]),
       this.hat, this.hatColor, this.head, this.headColor, this.body, this.bodyColor, this.feet, this.feetColor, this.speed, this.accel, this.jump, this.id);
   }
+  setLastIp(ip) { if (ip && ip !== this.lastIp) { this.lastIp = ip; this.store.db.prepare('UPDATE users SET last_ip = ? WHERE id = ?').run(ip, this.id); } }
   saveFriends() {
     const db = this.store.db;
     db.prepare('DELETE FROM friends WHERE user_id = ?').run(this.id);

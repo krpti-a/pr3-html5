@@ -1,6 +1,10 @@
 // Real-time game server over WebSocket (port of PlatformRacing3.Server: login, chat rooms,
 // match listings, multiplayer matches with prizes/EXP/hats, PMs and friends).
 // Messages are JSON objects with a "t" type field, the same messages the original socket carried.
+import { describeTime } from './mod.js';
+import { RateLimiter } from './limits.js';
+// per-connection message budget: the client sends ~30 position updates/s plus the odd chat/item message
+const MSG_PER_MINUTE = 6000, MSG_BURST = 600, MAX_ROOMS_PER_SESSION = 8;
 import { GuestUser, roundEven, expForFinishing, expForDefeating, playtimeMul, keyPressMul, nextRankExp, HAT_MAX } from './users.js';
 const DEBUG = !!process.env.PR3_DEBUG;
 // Maths.DEG_RAD / Maths.RotatePoint of the original server (note the truncated constant)
@@ -17,8 +21,8 @@ const COWBOY = 4, CARDBOARD_BOX = 11, BASEBALL_CAP = 2;
 const rnd = n => Math.floor(Math.random() * n);
 
 export class GameServer {
-  constructor({ users, content, redeemToken, serverName = 'Local Server' }) {
-    Object.assign(this, { users, content, redeemToken, serverName });
+  constructor({ users, content, mod, redeemToken, serverName = 'Local Server' }) {
+    Object.assign(this, { users, content, mod, redeemToken, serverName });
     this.sessions = new Map();
     this.chatRooms = new Map();
     this.listings = new Map();
@@ -26,14 +30,20 @@ export class GameServer {
     this.quickJoin = new Set();
     this.nextSocket = 1; this.nextListing = 0; this.nextMatch = 0; this.nextGuest = 1;
     this.createChat('chat-Home', 0, '', 'Welcome to Platform Racing 3!', true);
-    setInterval(() => this.tick(), 1000).unref();
+    this.msgLimit = new RateLimiter(MSG_PER_MINUTE, MSG_BURST);
+    setInterval(() => { try { this.tick(); } catch (e) { console.error('tick error', e); } }, 1000).unref();
   }
   onlineCount() { let n = 0; for (const s of this.sessions.values()) if (s.loggedIn) n++; return n; }
   isOnline(uid) { for (const s of this.sessions.values()) if (s.user?.id === uid && !s.user.isGuest) return true; return false; }
   connect(ws, ip) {
     const s = new Session(this, ws, ip, this.nextSocket++);
     this.sessions.set(s.socketId, s);
-    ws.on('message', m => { try { this.handle(s, typeof m === 'string' ? JSON.parse(m) : null); } catch (e) { console.error('game message error', e); } });
+    ws.on('message', m => {
+      // over budget: drop the message; a client that keeps flooding is disconnected
+      if (!this.msgLimit.take(s.socketId)) { if (++s.dropped > MSG_BURST) ws.close(4008); return; }
+      s.dropped = 0;
+      try { this.handle(s, typeof m === 'string' ? JSON.parse(m) : null); } catch (e) { if (!(e instanceof SyntaxError)) console.error('game message error', e); }
+    });
     ws.on('close', () => this.disconnect(s));
   }
   disconnect(s) {
@@ -58,8 +68,9 @@ export class GameServer {
 
   handle(s, m) {
     if (!m) return;
+    if (typeof m !== 'object') return;
     const t = m.t ?? m.type;
-    const h = HANDLERS[t];
+    const h = typeof t === 'string' && Object.hasOwn(HANDLERS, t) ? HANDLERS[t] : null;
     if (DEBUG && t !== 'update' && t !== 'ping') console.log(`< ${s.socketId} ${JSON.stringify(m).slice(0, 200)}`);
     if (!h) return;
     if (!s.loggedIn && !['confirm_connection', 'guest_login', 'token_login', 'login', 'ping', 'test_ping', 'mv'].includes(t)) return;
@@ -67,11 +78,15 @@ export class GameServer {
   }
 
   login(s, user) {
+    const ban = this.mod?.active('ban', user.isGuest ? 0 : user.id, s.ip);
+    if (ban) return s.send({ t: 'loginError', error: this.mod.message(ban) });
+    if (!user.isGuest) user.setLastIp?.(s.ip);
     s.user = user;
     s.loginTime = Date.now();
     s.loggedIn = true;
     user.setServer(this.serverName);
-    s.send({ t: 'loginSuccess', socketID: s.socketId, userID: user.id, userName: user.username, permissions: user.permissions, vars: user.vars('*') });
+    const silence = this.mod?.active('silence', user.isGuest ? 0 : user.id, s.ip);
+    s.send({ t: 'loginSuccess', socketID: s.socketId, userID: user.id, userName: user.username, permissions: user.permissions, vars: { ...user.vars('*'), silencedMessage: silence ? this.mod.message(silence) : '' } });
     if (!user.isGuest) s.send({ t: 'receiveFriendsAndIgnored', friendArray: [...user.friends], ignoredArray: [...user.ignoredSet] });
   }
   levelList(s, m) {
@@ -103,14 +118,56 @@ export class GameServer {
   lotd() {
     let l = [...this.listings.values()].filter(x => x.type === 'lotd').sort((a, b) => b.clients.size - a.clients.size)[0];
     if (!l) {
+      const featured = +(this.users.db.prepare("SELECT v FROM kv WHERE k = 'lotd'").get()?.v ?? 0);
       const levels = this.content.campaignLevels().levels;
-      if (!levels.length) return null;
-      const lv = levels[rnd(levels.length)];
+      const lv = (featured && this.content.level(featured)) || levels[rnd(levels.length)];
+      if (!lv) return null;
       const id = ++this.nextListing;
       l = new MatchListing(this, 'lotd', null, lv, `lotd-${id}`, 0, 2 ** 31, 4, false);
       this.listings.set(l.name, l);
     }
     return l;
+  }
+  // true (and tells the player) when a silence stops them from chatting / sending PMs
+  isSilenced(s) {
+    const b = this.mod?.active('silence', s.isGuest ? 0 : s.user.id, s.ip);
+    if (b) s.send({ t: 'alert', message: this.mod.message(b) });
+    return !!b;
+  }
+  // a moderator's ban/silence of an online session (socket_id) or an account (user_id)
+  banUser(s, m) {
+    const type = m.ban_type === 'silence' ? 'silence' : 'ban';
+    if (!s.user.hasPermission(type === 'ban' ? 'access_ban_user' : 'access_silence_user')) return;
+    const target = this.sessions.get(+m.socket_id);
+    const online = target?.loggedIn ? target : null;
+    const uid = online ? online.user.id : +m.user_id || 0;
+    const tu = uid ? this.users.get(uid) : null;
+    if (!online && !tu) return s.send({ t: 'alert', message: 'User not found.' });
+    if ((uid && uid === s.user.id) || online === s) return s.send({ t: 'alert', message: `You can not ${type} yourself.` });
+    if (tu && (tu.permissionRank ?? 0) >= (s.user.permissionRank ?? 0)) return s.send({ t: 'alert', message: `You can not ${type} this user.` });
+    let seconds = Math.round(+m.seconds);
+    if (seconds !== -1 && !(seconds > 0)) return s.send({ t: 'alert', message: 'Please enter a duration.' });
+    if (seconds !== -1) seconds = Math.min(seconds, 10 * 365 * 24 * 3600);
+    const ip = online?.ip ?? tu?.lastIp ?? '';
+    const b = this.mod.add(type, s.user.id, uid, ip, seconds, m.reason, m.log);
+    const msg = this.mod.message(b);
+    for (const x of [...this.sessions.values()]) {
+      if (!x.loggedIn || !(uid ? x.user.id === uid && !x.isGuest : x.isGuest && x.ip === ip)) continue;
+      x.send({ t: 'alert', message: msg });
+      if (type === 'ban') x.ws.close(4003);
+    }
+    const name = tu?.username ?? online?.user.username ?? 'The user';
+    s.send({ t: 'alert', message: `${name} has been ${type === 'ban' ? 'banned' : 'silenced'} ${describeTime(seconds)}.` });
+  }
+  // Level of the Day picked by a moderator (stored, so it survives restarts); null clears it
+  featureLevel(id) {
+    const lv = id ? this.content.level(id) : null;
+    if (id && !lv) return false;
+    const db = this.users.db;
+    if (lv) db.prepare("INSERT OR REPLACE INTO kv (k, v) VALUES ('lotd', ?)").run(String(id)); else db.prepare("DELETE FROM kv WHERE k = 'lotd'").run();
+    // empty LOTD listings of another level are replaced on the next request
+    for (const l of [...this.listings.values()]) if (l.type === 'lotd' && l.level.id !== id && l.clients.size === 0 && l.lobbyClients.size === 0) this.listings.delete(l.name);
+    return true;
   }
   sendPm(fromUser, toName, title, message, kind = 'text', data = '') {
     const to = typeof toName === 'number' ? this.users.get(toName) : this.users.byName(toName);
@@ -124,7 +181,7 @@ export class GameServer {
 class Session {
   constructor(server, ws, ip, id) {
     Object.assign(this, { server, ws, ip, socketId: id });
-    this.loggedIn = false; this.confirmed = false; this.user = null; this.ping = 0;
+    this.loggedIn = false; this.confirmed = false; this.user = null; this.ping = 0; this.dropped = 0;
     this.lobby = { listing: null, matches: new Set() };
     this.match = null; // MatchPlayer
     this.tracking = new Map(); // room -> Set(socketId)
@@ -181,7 +238,7 @@ class ChatRoom {
   handleData(s, data, sendToSelf) {
     if (!this.clients.has(s) || data?.type !== 'chat' || s.isGuest) return;
     const text = String(data.data?.message ?? '').trim().slice(0, 300);
-    if (!text) return;
+    if (!text || this.server.isSilenced(s)) return;
     if (text.startsWith('/')) return s.send({ t: 'alert', message: 'Unknown command' });
     const msg = chatMsg(this.name, text, s);
     this.recent.push(msg); if (this.recent.length > 25) this.recent.shift();
@@ -469,7 +526,7 @@ class MultiplayerMatch {
     const room = this.name, d = data?.data ?? {};
     let msg = null;
     switch (data?.type) {
-      case 'chat': if (s.isGuest) return; msg = chatMsg(room, String(d.message ?? '').slice(0, 300), s); break;
+      case 'chat': if (s.isGuest || this.server.isSilenced(s)) return; msg = chatMsg(room, String(d.message ?? '').slice(0, 300), s); break;
       case 'useItem': msg = { t: 'receiveMessage', roomName: room, socketID: s.socketId, data: { type: 'useItem', data: { p: d.p } } }; break;
       case 'shatterBlock': msg = { t: 'receiveMessage', roomName: room, data: { type: 'shatterBlock', data: { tileY: d.tileY, tileX: d.tileX } } }; break;
       case 'explodeBlock': msg = { t: 'receiveMessage', roomName: room, data: { type: 'explodeBlock', data: { tileY: d.tileY, tileX: d.tileX } } }; break;
@@ -615,8 +672,12 @@ const HANDLERS = {
   jr(s, m) {
     const room = String(m.room_name ?? '');
     if (m.room_type === 'chat') {
+      if (!room || room.length > 64) return;
+      // a player can only sit in a few chat rooms (each new name would otherwise create a room)
+      let inRooms = 0; for (const r of this.chatRooms.values()) if (r.clients.has(s)) inRooms++;
+      if (inRooms >= MAX_ROOMS_PER_SESSION) return s.send({ t: 'alert', message: 'You are in too many chat rooms.' });
       let r = this.chatRooms.get(room);
-      if (!r) { if (s.isGuest) return; r = this.createChat(room, s.user.id, m.pass ?? '', m.note ?? ''); }
+      if (!r) { if (s.isGuest) return; r = this.createChat(room, s.user.id, String(m.pass ?? '').slice(0, 64), String(m.note ?? '').slice(0, 300)); }
       if (!r.pass || r.pass === m.pass) r.join(s, m.chatId | 0);
     } else if (m.room_type === 'match_listing') {
       const l = this.listings.get(room);
@@ -704,7 +765,7 @@ const HANDLERS = {
   },
   rate_level(s, m) { if (!s.isGuest) this.content.rate(+m.level_id, s.user.id, +m.rating); },
   delete_level(s, m) { if (!s.isGuest) this.content.deleteLevel(+m.level_id, s.user.id); },
-  unpublish_level(s, m) { if (!s.isGuest) this.content.unpublishLevel(+m.level_id, s.user.id); },
+  unpublish_level(s, m) { if (!s.isGuest) this.content.unpublishLevel(+m.level_id, s.user.id, s.user.hasPermission('access_unpublish_level')); },
   get_pms(s, m) {
     if (s.isGuest) return s.send({ t: 'receivePMs', requestID: +m.request_id || 0, results: 0, pmArray: [] });
     const db = this.users.db;
@@ -722,12 +783,25 @@ const HANDLERS = {
   delete_pm(s, m) { if (!s.isGuest) this.users.db.prepare('UPDATE pms SET deleted = 1 WHERE id = ? AND to_id = ?').run(+m.message_id, s.user.id); },
   send_pm(s, m) {
     if (s.isGuest) return s.send({ t: 'alert', message: 'Guests can not send private messages' });
+    if (this.isSilenced(s)) return;
     const e = this.sendPm(s.user, String(m.name ?? ''), m.title ?? '', m.message ?? '');
     if (e) s.send({ t: 'alert', message: e });
   },
-  report_pm() {},
-  send_thing(s, m) {
+  report_pm(s, m) {
     if (s.isGuest) return;
+    const pm = this.users.db.prepare('SELECT id FROM pms WHERE id = ? AND to_id = ?').get(+m.message_id, s.user.id);
+    if (pm) this.users.db.prepare('INSERT OR IGNORE INTO flagged_messages (pm_id, reporter_id, reported_time) VALUES (?, ?, unixepoch())').run(pm.id, s.user.id);
+  },
+  ban_user(s, m) { this.banUser(s, m); },
+  get_user_bans(s, m) {
+    if (!s.user.hasPermission('access_bans')) return;
+    const target = this.sessions.get(+m.socket_id);
+    const uid = +m.user_id || (target?.loggedIn && !target.isGuest ? target.user.id : 0);
+    const ip = (target?.loggedIn ? target.ip : '') || (uid ? this.users.get(uid)?.lastIp : '') || '';
+    s.send({ t: 'receiveUserBans', ...this.mod.counts(uid, ip) });
+  },
+  send_thing(s, m) {
+    if (s.isGuest || this.isSilenced(s)) return;
     const data = JSON.stringify({ thing: m.thing, id: +m.thing_id, title: String(m.thing_title ?? ''), from: s.user.id });
     const e = this.sendPm(s.user, +m.user_id, `${s.user.username} sent you a ${m.thing}`, String(m.thing_title ?? ''), 'thing', data);
     if (e) s.send({ t: 'alert', message: e });

@@ -97,7 +97,7 @@ export class MyStampSelector extends CategorySelector {
          this.requestArray = new Array();
          for (stamp of $each(stamps))
          {
-            this.requestArray.push(new Number(stamp.stampId));
+            this.requestArray.push(Number(stamp.stampId));
          }
          StampManager.requestManyStamps(this.requestArray);
       }

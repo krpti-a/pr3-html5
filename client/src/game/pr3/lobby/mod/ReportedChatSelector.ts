@@ -19,6 +19,7 @@ export class ReportedChatSelector extends ModSelector {
       }
   requestResultsFromServer(param1: number, param2: number): void {
     param1 = int(param1); param2 = int(param2);
+         if(this.archiveNum === undefined) return;
          var _loc_3= ({} as any);
          _loc_3.p_start = param1;
          _loc_3.p_count = param2;
@@ -74,6 +75,7 @@ export class ReportedChatSelector extends ModSelector {
          {
             this.archiveNum = int(1);
          }
+         this.setPageNum(this.getLastRememberedPage());
          var _loc_2= ({} as any);
          _loc_2.p_archive = this.archiveNum;
          var _loc_3= false;

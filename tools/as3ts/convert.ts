@@ -542,7 +542,9 @@ for (const o of outputs) {
   if (baseInfo && ((baseInfo as any).symbol)) report.push(`symbol base ${o.c.name} extends ${base}`);
   if (refs.length) imp.push(`import { ${refs.join(', ')} } from '${relTo('refs.ts')}';`);
   const reg = `import { $reg } from '${relTo('refs.ts')}';`;
-  const code = `// Ported from ${o.c.file}\n${imp.join('\n')}\n${reg}\n\n${o.code}\n$reg('${o.c.qname}', ${o.c.name});\n`;
+  // AS3 `new Number(x)` / `new String()` etc. are primitives; in JS they'd be wrapper objects (indexOf/=== fail)
+  const body = o.code.replace(/(?<![\w$.])new (Number|String|Boolean|int|uint)\(/g, '$1(');
+  const code = `// Ported from ${o.c.file}\n${imp.join('\n')}\n${reg}\n\n${body}\n$reg('${o.c.qname}', ${o.c.name});\n`;
   mkdirSync(dir, { recursive: true });
   if (existsSync(file)) {
     const old = readFileSync(file, 'utf8');

@@ -81,7 +81,15 @@ function fixture() {
     campaignLevels() { return { levels: [level] }; },
     addPlays() {},
   };
-  const users = { get() { return null; }, byName() { return null; } };
+  const users = {
+    db: {
+      prepare() {
+        return { get() { return undefined; } };
+      },
+    },
+    get() { return null; },
+    byName() { return null; },
+  };
   const server = new GameServer({ users, content, redeemToken() { return 0; } });
 
   const connect = (id, username) => {

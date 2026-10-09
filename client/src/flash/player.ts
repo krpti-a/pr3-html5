@@ -3,7 +3,7 @@ import { Stage, DisplayObject, DisplayObjectContainer, MovieClip, Sprite, Simple
 import { TextField } from './text.ts';
 import { Event, MouseEvent, KeyboardEvent, TextEvent, broadcastEvent } from './events.ts';
 import { Matrix, Point, ColorTransform } from './geom.ts';
-import { clock, runTimers, reportError } from './utils.ts';
+import { clock, runTimers, reportError, safeUrl } from './utils.ts';
 import { resumeAudio } from './media.ts';
 import { canvasStats } from './canvas.ts';
 import { Mouse } from './misc.ts';
@@ -254,7 +254,7 @@ function setupInput() {
       if (t instanceof TextField) {
         const url = t._linkAt(p.x, p.y);
         if (url.startsWith('event:')) { try { t.dispatchEvent(new TextEvent(TextEvent.LINK, true, false, url.slice(6))); } catch (err) { reportError(err); } }
-        else if (url) window.open(url, '_blank', 'noopener');
+        else if (safeUrl(url)) window.open(url, '_blank', 'noopener');
       }
       const now = performance.now();
       if (t.doubleClickEnabled && lastClick.o === t && now - lastClick.t < 500) mouseEvt(MouseEvent.DOUBLE_CLICK, t, p);

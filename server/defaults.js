@@ -15,6 +15,9 @@ export function ensureDefaults(db) {
   } else if (process.env.PR3_ADMIN_PASS && !verifyPassword(ADMIN_PASS, u.password)) {
     db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashPassword(ADMIN_PASS), u.id);
   }
+  // the built-in password ships with the code: fine on your own machine, an open admin account on a public server
+  if (!process.env.PR3_ADMIN_PASS && verifyPassword(ADMIN_PASS, db.prepare('SELECT password FROM users WHERE id = ?').get(u.id).password))
+    console.warn(`WARNING: admin account "${ADMIN_USER}" uses the built-in default password. Before putting this server online, start it with PR3_ADMIN_PASS=<your own password>.`);
   db.prepare("UPDATE users SET group_name = 'Admin', permission_rank = 1000, archived = 0, hats = ?, heads = ?, bodys = ?, feets = ? WHERE id = ?")
     .run(range(HAT_MAX), range(PART_MAX), range(PART_MAX), range(PART_MAX), u.id);
   // a gold run (half a second under the gold time) on every campaign level not already golded

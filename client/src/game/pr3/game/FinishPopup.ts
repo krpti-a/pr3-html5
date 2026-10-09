@@ -132,7 +132,7 @@ export class FinishPopup extends ButtonPopup {
          SocketManager.socket.unpublishLevel(this.levelID);
       }
   confirmFeature(): void {
-         var _loc_1= new XML("<Params><p_level_id>" + this.levelID + "</p_level_id></Params>");
+         var _loc_1= { p_level_id: this.levelID };
          var _loc_2= false;
          Sparkworkz.DataAccess("SetLOTD",_loc_1,$b(this, 'setFeaturedLevelCallback'),_loc_2);
       }

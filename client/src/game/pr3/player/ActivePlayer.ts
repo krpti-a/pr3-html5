@@ -2298,7 +2298,7 @@ export class ActivePlayer extends Player {
             {
                if(this.itemClass == null)
                {
-                  settingsToGive = new String(Items.PORTABLE_BLOCK + "|id|" + Math.floor(Math.random() * 104400));
+                  settingsToGive = String(Items.PORTABLE_BLOCK + "|id|" + Math.floor(Math.random() * 104400));
                   this.setVariable("item",Items.NONE);
                   this.setVariable("item",settingsToGive);
                   this.trafficBlockDelay = 300;

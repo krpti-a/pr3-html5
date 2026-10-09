@@ -12,6 +12,7 @@ export function openDb(file, seed) {
   db.exec(SCHEMA);
   // migrations
   if (!db.prepare('PRAGMA table_info(level_ratings)').all().some(c => c.name === 'rated_on')) db.exec('ALTER TABLE level_ratings ADD COLUMN rated_on INTEGER NOT NULL DEFAULT 0');
+  if (!db.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'last_ip')) db.exec("ALTER TABLE users ADD COLUMN last_ip TEXT NOT NULL DEFAULT ''");
   return db;
 }
 
@@ -53,4 +54,12 @@ CREATE TABLE IF NOT EXISTS pms (id INTEGER PRIMARY KEY, to_id INTEGER NOT NULL, 
 CREATE INDEX IF NOT EXISTS pms_to ON pms(to_id);
 CREATE TABLE IF NOT EXISTS user_level_data (user_id INTEGER NOT NULL, level_id INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (user_id, level_id));
 CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+-- moderation: bans/silences (expire_time -1 = permanent; user_id 0 = guest, matched by ip), reported PMs and chats
+CREATE TABLE IF NOT EXISTS bans (id INTEGER PRIMARY KEY, ban_type TEXT NOT NULL, mod_id INTEGER NOT NULL, user_id INTEGER NOT NULL DEFAULT 0, ip TEXT NOT NULL DEFAULT '',
+  ban_time INTEGER NOT NULL, expire_time INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT '', log TEXT NOT NULL DEFAULT '', lifted INTEGER NOT NULL DEFAULT 0, lifted_by INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS bans_user ON bans(user_id);
+CREATE INDEX IF NOT EXISTS bans_ip ON bans(ip);
+CREATE TABLE IF NOT EXISTS flagged_messages (pm_id INTEGER PRIMARY KEY, reporter_id INTEGER NOT NULL, reported_time INTEGER NOT NULL, picker_id INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS flagged_chats (id INTEGER PRIMARY KEY, reporter_id INTEGER NOT NULL, reported_user_id INTEGER NOT NULL, room TEXT NOT NULL DEFAULT '', log TEXT NOT NULL,
+  time INTEGER NOT NULL, picker_id INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
 `;
