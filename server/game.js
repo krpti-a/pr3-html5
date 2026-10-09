@@ -234,6 +234,10 @@ class MatchListing {
     return true;
   }
   leaveLobby(s) { this.lobbyClients.delete(s); s.lobby.matches.delete(this); s.untrackAll(this.name); }
+  assignHost(s) {
+    this.host = s.socketId;
+    s.send({ t: 'matchOwner', matchName: this.name, play: true, kick: this.type === 'normal', ban: this.type === 'normal' });
+  }
   join(s) {
     if (this.canJoin(s) !== 'ok' || this.clients.has(s.socketId)) return false;
     this.clients.set(s.socketId, s);
@@ -245,7 +249,7 @@ class MatchListing {
       o.track(this.name, s, s.vars(LISTING_VARS));
     }
     for (const o of this.lobbyClients) o.track(this.name, s, s.vars(LISTING_VARS));
-    if (this.type === 'normal' && (this.host === s.socketId || this.host === 0)) { this.host = s.socketId; s.send({ t: 'matchOwner', matchName: this.name, play: true, kick: true, ban: true }); }
+    if ((this.type === 'normal' || this.type === 'lotd') && (this.host === s.socketId || this.host === 0)) this.assignHost(s);
     if (this.clients.size >= this.maxMembers) { this.full = true; this.start(); }
     return true;
   }
@@ -255,12 +259,14 @@ class MatchListing {
     for (const o of this.clients.values()) o.untrack(this.name, s.socketId);
     for (const o of this.lobbyClients) o.untrack(this.name, s.socketId);
     s.untrackAll(this.name);
-    if (this.type === 'lotd') return;
-    if (this.clients.size === 0) { for (const o of this.lobbyClients) { o.lobby.matches.delete(this); o.untrackAll(this.name); } this.server.listings.delete(this.name); return; }
-    if (this.type === 'normal' && this.host === s.socketId) {
+    if (this.clients.size === 0) {
+      this.host = 0;
+      if (this.type !== 'lotd') { for (const o of this.lobbyClients) { o.lobby.matches.delete(this); o.untrackAll(this.name); } this.server.listings.delete(this.name); }
+      return;
+    }
+    if ((this.type === 'normal' || this.type === 'lotd') && this.host === s.socketId) {
       const next = this.clients.values().next().value;
-      this.host = next.socketId;
-      next.send({ t: 'matchOwner', matchName: this.name, play: true, kick: true, ban: true });
+      this.assignHost(next);
     }
   }
   forceStart(s) { if (this.host === s.socketId && this.clients.size > 0) { this.full = true; this.start(); } }
